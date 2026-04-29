@@ -1,0 +1,9 @@
+{
+  "category.villager-trading-predictor": "Villager Trading Predictor",
+  "category.villager-trading-predictor.category": "Villager Trading Predictor",
+  "key.villager-trading-predictor.toggle": "Toggle VTP Overlay",
+  "key.villager-trading-predictor.open_gui": "Open VTP Settings GUI",
+  "key.villager-trading-predictor.reroll_up": "VTP Reroll Count +1",
+  "key.villager-trading-predictor.reroll_down": "VTP Reroll Count -1",
+  "key.villager-trading-predictor.auto_reroll": "Toggle VTP Auto Reroll"
+}
