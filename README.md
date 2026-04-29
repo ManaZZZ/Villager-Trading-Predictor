@@ -1,3 +1,7 @@
+## License
+This mod is proprietary software. All rights reserved.
+You may not copy, modify, or distribute it without explicit permission from the author.
+
 # Villager Trading Predictor
 
 Predicts the enchantments a villager will offer at every profession level, giving you a full picture of what that villager is worth. If a villager has nothing useful across all their levels, you will know immediately and can move on without wasting a single reroll.
