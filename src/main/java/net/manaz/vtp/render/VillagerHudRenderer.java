@@ -93,7 +93,7 @@ public class VillagerHudRenderer implements HudElement {
         }
 
         if (!enabled || targets.isEmpty()) return;
-        if (client.screen instanceof MerchantScreen) return;
+        if (client.gui.screen() instanceof MerchantScreen) return;
         if (!(crosshairEntity instanceof Villager villager)) return;
 
         VillagerData villagerData = villager.getVillagerData();

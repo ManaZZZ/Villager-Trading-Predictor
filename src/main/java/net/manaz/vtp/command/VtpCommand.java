@@ -85,7 +85,7 @@ public class VtpCommand {
                     // /vtp  (no args) → open settings GUI
                     .executes(ctx -> {
                         Minecraft mc = Minecraft.getInstance();
-                        mc.execute(() -> mc.setScreen(new VtpSettingsScreen()));
+                        mc.execute(() -> mc.gui.setScreen(new VtpSettingsScreen()));
                         return 1;
                     })
                     // /vtp seed [value]
