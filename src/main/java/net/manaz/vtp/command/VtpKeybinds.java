@@ -68,8 +68,8 @@ public class VtpKeybinds {
             }
 
             while (openGuiKey.consumeClick()) {
-                if (client.screen == null) {
-                    client.setScreen(new VtpSettingsScreen());
+                if (client.gui.screen() == null) {
+                    client.gui.setScreen(new VtpSettingsScreen());
                 }
             }
 
