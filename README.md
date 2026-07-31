@@ -29,4 +29,14 @@ Sets the targeted enchantment(s).
 ### `/vtp toggle`
 Toggles the HUD.
 
+# Minecraft 26.2 port
+
+This copy is ported to Minecraft 26.2, Fabric Loader 0.19.3, and Fabric API
+0.155.2+26.2. Build with Java 25:
+
+```sh
+./gradlew build
+```
+
+The remapped client JAR is written to `build/libs/`.
 
