@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "package": "net.manaz.vtp.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "accessor.VillagerTradeAccessor",
+    "MerchantScreenMixin",
+    "GuiItemRenderStateMixin",
+    "GuiRendererMixin",
+    "MultiPlayerGameModeMixin",
+    "VillagerMixin",
+    "ClientPacketListenerMixin",
+    "accessor.AbstractVillagerAccessor",
+    "accessor.XoroshiroSourceAccessor",
+    "accessor.XoroshiroStateAccessor",
+    "accessor.RandomSequencesAccessor",
+    "accessor.EnchantRandomlyAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

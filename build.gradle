@@ -1,0 +1,115 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+def currentBuildNumber = project.build_number.toInteger()
+version = "${project.mod_version}.${currentBuildNumber}"
+group = project.maven_group
+
+base {
+	archivesName = "VTP"
+}
+
+repositories {
+	// Add repositories to retrieve artifacts from in here.
+	// You should only use this when depending on other mods because
+	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
+	// for more information about repositories.
+}
+
+fabricApi {
+	configureDataGeneration {
+		client = true
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    testImplementation "org.junit.jupiter:junit-jupiter:5.13.4"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.13.4"
+	
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": inputs.properties.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+	// if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	inputs.property "projectName", project.name
+
+	from("LICENSE") {
+		rename { "${it}_${project.name}"}
+	}
+}
+
+// configure the maven publication
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+
+	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+	repositories {
+		// Add repositories to publish to here.
+		// Notice: This block does NOT have the same function as the block in the top level.
+		// The repositories here will be used for publishing your artifact, not for
+		// retrieving dependencies.
+	}
+}
+
+tasks.named("build") {
+	doLast {
+		def propsFile = file("gradle.properties")
+		def lines = propsFile.readLines("UTF-8")
+		def buildNumberLine = lines.findIndexOf { it.startsWith("build_number=") }
+		if (buildNumberLine < 0) {
+			throw new GradleException("gradle.properties is missing build_number")
+		}
+
+		def nextBuildNumber = currentBuildNumber + 1
+		lines[buildNumberLine] = "build_number=${nextBuildNumber}"
+		propsFile.setText(lines.join(System.lineSeparator()) + System.lineSeparator(), "UTF-8")
+		logger.lifecycle("Built VTP-${project.version}.jar; next build will be ${project.mod_version}.${nextBuildNumber}")
+	}
+}
+
+tasks.named("test") { useJUnitPlatform() }
+fabricApi.configureTests {
+    createSourceSet = true
+    modId = "vtp-gametest"
+    enableGameTests = false
+    enableClientGameTests = true
+    clearRunDirectory = false
+}
