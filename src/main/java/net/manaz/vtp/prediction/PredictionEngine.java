@@ -124,6 +124,26 @@ public final class PredictionEngine {
         return rounds.isEmpty() ? List.of() : rounds.getFirst();
     }
 
+
+    /** Search for the first target at or after an absolute sequence position. */
+    public static PredictionResult predictFrom(long seed,
+            Holder<VillagerProfession> profession, int level,
+            EnchantmentTarget target, int startRound) {
+        if (startRound < 0 || startRound > MAX_ROUND
+                || !compatibilityProblem(profession, level).isEmpty()) {
+            return new PredictionResult(Optional.empty(), 0, List.of(), List.of());
+        }
+        var rounds = getUpcomingRounds(seed, profession, level, startRound, maxRerolls);
+        var first = rounds.isEmpty() ? List.<TradeSimulator.SimulatedOffer>of() : rounds.getFirst();
+        for (int i = 0; i < rounds.size(); i++) {
+            var offers = rounds.get(i);
+            if (matchesTarget(offers, target)) {
+                int round = startRound + i;
+                return new PredictionResult(Optional.of(round), round, offers, first);
+            }
+        }
+        return new PredictionResult(Optional.empty(), startRound + rounds.size(), List.of(), first);
+    }
     /** Check actual current offers, then search the shared future. Historical consumed rounds cannot be targets. */
     public static PredictionResult predictForVillager(long seed, UUID uuid, VillagerData data, EnchantmentTarget target) {
         var actual = VillagerTracker.getCurrentOffers(uuid).orElse(List.of());
