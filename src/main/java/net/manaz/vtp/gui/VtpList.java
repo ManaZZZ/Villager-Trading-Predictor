@@ -7,8 +7,8 @@ import net.minecraft.client.gui.narration.*;
 import net.minecraft.client.input.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.*;
-import org.lwjgl.glfw.GLFW;
 
 /** Clipped item rows with native input, narration and subtle green selection feedback. */
 public final class VtpList extends AbstractWidget {
@@ -126,17 +126,17 @@ public final class VtpList extends AbstractWidget {
     }
     @Override public boolean keyPressed(KeyEvent event) {
         int key = event.key();
-        if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_PAGE_UP || key == GLFW.GLFW_KEY_PAGE_DOWN
-                || key == GLFW.GLFW_KEY_HOME || key == GLFW.GLFW_KEY_END) {
+        if (key == InputConstants.KEY_UP || key == InputConstants.KEY_DOWN || key == InputConstants.KEY_PAGEUP || key == InputConstants.KEY_PAGEDOWN
+                || key == InputConstants.KEY_HOME || key == InputConstants.KEY_END) {
             if (entries.isEmpty()) return true;
-            int step = key == GLFW.GLFW_KEY_PAGE_UP || key == GLFW.GLFW_KEY_PAGE_DOWN ? visibleRows() : 1;
-            selected = key == GLFW.GLFW_KEY_HOME ? 0 : key == GLFW.GLFW_KEY_END ? entries.size() - 1
-                    : Math.clamp(selected + (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_PAGE_UP ? -step : step), 0, entries.size() - 1);
+            int step = key == InputConstants.KEY_PAGEUP || key == InputConstants.KEY_PAGEDOWN ? visibleRows() : 1;
+            selected = key == InputConstants.KEY_HOME ? 0 : key == InputConstants.KEY_END ? entries.size() - 1
+                    : Math.clamp(selected + (key == InputConstants.KEY_UP || key == InputConstants.KEY_PAGEUP ? -step : step), 0, entries.size() - 1);
             if (selected < offset) offset(selected);
             if (selected >= offset + visibleRows()) offset(selected - visibleRows() + 1);
             return true;
         }
-        if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_SPACE) && selected >= 0 && selected < entries.size()) {
+        if ((key == InputConstants.KEY_RETURN || key == InputConstants.KEY_SPACE) && selected >= 0 && selected < entries.size()) {
             Runnable action = entries.get(selected).action();
             if (action != null) { playDownSound(Minecraft.getInstance().getSoundManager()); action.run(); }
             return true;

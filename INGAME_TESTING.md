@@ -1,6 +1,6 @@
 # In-game regression guide
 
-Use Minecraft 26.2, Fabric Loader 0.19.3 or newer, Fabric API for 26.2, and Java 25. Replace the old VTP jar with the new regular jar from `build/libs`; do not install the sources jar or two VTP versions together.
+Use the same universal JAR on Minecraft 26.1, 26.1.1, 26.1.2, 26.2 and 26.3, with Fabric Loader 0.19.5 or newer, Fabric API for the running Minecraft version, and Java 25. Replace the previous VTP JAR with the universal JAR from the root `build/libs`. The version-specific module JARs are internal build outputs.
 
 The HUD and settings use Minecraft's GUI Scale. The settings window adapts down to 320×240 GUI pixels; lists scroll when space is limited.
 
@@ -64,15 +64,18 @@ On multiplayer, setting a different seed must clear old alignment before loading
 
 ## 6. Multiplayer calibration and drift detection
 
-1. Join a vanilla 26.2 server whose seed you know and run `/vtp seed <seed>`.
+1. Join a vanilla server matching your client version whose seed you know. Open `/vtp` → Settings and paste the seed into World seed. It should apply immediately without a Set button. Use Show/Hide to reveal or mask it; close and reopen Settings, then reconnect, to check the saved value and visibility preference. `/vtp seed <seed>` remains available.
 2. Open an untraded librarian's trades. The HUD either finds an observed match or remains **Check alignment in /vtp**.
-3. For calibration, record consecutive rerolls from that same librarian. Include a `none` observation for rounds without a book.
-4. Use the GUI Calibrate tab or a command such as `/vtp calibrate efficiency 3; none; mending 1`, substituting the actual sequence you observed.
-5. If several matches are reported, add observations or confirm one of the reported rounds with `/vtp confirm <round>`.
+3. For calibration, record at least five consecutive rerolls from that same librarian. Include a `none` observation for rounds without a book.
+4. Click **Add observation** below the trading screen after each generated round. The Calibrate tab should list its enchantment, level, and base price, or No book. Double-click and reopen the same trades: only one observation should remain. A discounted book should retain its original base price in calibration.
+5. Each addition checks calibration. When there is one match, expect **Sequence calibrated**, a green **Calibrated** merchant button, and an aligned forecast. If several matches remain, record another reroll. The manual Calibrate form also checks automatically after Add observation or Add no book; commands such as `/vtp calibrate efficiency 3; none; mending 1` remain available.
 6. Try confirming a candidate while looking at a different villager, or after another reroll.
 7. Have another player generate librarian trades, then open your librarian's next set.
+8. In the manual Calibrate form, select an enchantment and level and enter part of a price. Close the menu, check the villager, and reopen within a minute: all three inputs should remain. Wait over a minute after closing, or select a different villager, to check that the unfinished draft expires.
 
 Expected: calibration updates the shared next position once and preserves observed offers. An unrelated or stale confirmation is rejected. Reopening identical offers does not advance the position. If other-player activity produces a mismatch, VTP reconciles only a unique match; ambiguous cases remain **Check alignment in /vtp**. Client-only multiplayer cannot guarantee continuous synchronization with activity it never receives.
+
+Vanilla trade definitions should load from the client game files, the enchantment picker should be populated, and calibration should work without server-side trade-registry packets. Disconnect, reconnect, and repeat to check that definitions and their registry lookups reload for the new session.
 
 Optional command prices are **base prices**: `/vtp calibrate mending 1 12`. Do not substitute a discounted displayed price.
 

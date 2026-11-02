@@ -29,7 +29,7 @@ VTP uses an original primitive renderer and Minecraft item stacks. It does not b
 
 ## Validation
 
-Run `gradlew.bat test runClientGameTest build` with Java 25.
+Run `gradlew.bat build testAllClients` with Java 25 to check the shared interface on every supported runtime.
 
 Unit tests cover color parsing, RGB/HSV round trips, readable accent text, visibility thresholds, and hover timing. Minecraft tests exercise square picker alignment, horizontal hue dragging, RGB/hex synchronization, 0/255 channel endpoints, invalid RGB/hex input, achromatic hue retention, keyboard hue adjustments, presets, HUD draft cancellation, live resize previews, preference save/reload, all five level buttons, every price stop, typed prices, Mending I at 10, Efficiency V at 17, Frost Walker II at 16, and actual look/range/timeout/never visibility behavior. Dialog and tab layouts are checked at GUI scales 1/2/3, with screenshots at 320×240 GUI pixels. Locked-villager tests cover individual books/prices, future tiers, masters, traded Novices and fitting both panels at GUI scales and size settings. Prediction checks still compare 20,000 vanilla rounds and 12 live rerolls.
 

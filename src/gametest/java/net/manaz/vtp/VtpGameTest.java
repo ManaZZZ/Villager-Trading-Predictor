@@ -10,7 +10,10 @@ import net.manaz.vtp.trade.*;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.RandomSequence;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.npc.villager.*;
 import net.minecraft.world.item.trading.*;
 import net.minecraft.world.level.storage.loot.*;
@@ -20,6 +23,11 @@ import java.util.*;
 
 public class VtpGameTest implements FabricClientGameTest {
     private record Spawn(UUID uuid, VillagerData data) {}
+    @SuppressWarnings("unchecked")
+    private static Villager newVillager(ServerLevel level) {
+        return new Villager((EntityType<? extends Villager>) BuiltInRegistries.ENTITY_TYPE.getValue(
+                Identifier.withDefaultNamespace("villager")), level);
+    }
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
     }
@@ -27,7 +35,7 @@ public class VtpGameTest implements FabricClientGameTest {
         try (var world = context.worldBuilder().create()) {
             var server = world.getServer();
             Spawn spawn = server.computeOnServer(mc -> {
-                Villager villager = new Villager(EntityTypes.VILLAGER, mc.overworld());
+                Villager villager = newVillager(mc.overworld());
                 villager.setNoAi(true);
                 villager.setPos(0, -60, 0);
                 villager.setVillagerData(villager.getVillagerData().withProfession(
@@ -42,6 +50,7 @@ public class VtpGameTest implements FabricClientGameTest {
                 }
                 VillagerTracker.updateAndSelect(spawn.uuid(), spawn.data());
             });
+            VtpTradePortGameTest.run(context, spawn.data().profession());
             // Differential oracle: native offer generation with an isolated RNG and loot context.
             server.runOnServer(mc -> {
                 Villager villager = (Villager) mc.overworld().getEntity(spawn.uuid());
@@ -62,7 +71,7 @@ public class VtpGameTest implements FabricClientGameTest {
                         var loot = new LootContext.Builder(params).withOptionalRandomSource(nativeRng).create(Optional.empty());
                         for (int round = 0; round < 1000; round++) {
                             MerchantOffers actual = new MerchantOffers();
-                            method.invoke(null, loot, actual, set.getTrades(), set.calculateNumberOfTrades(loot));
+                            method.invoke(null, loot, actual, net.manaz.vtp.compat.TradeCompat.trades(set), set.calculateNumberOfTrades(loot));
                             var prediction = TradeSimulator.simulateTradeRound(set, simulated, List.of());
                             check(OfferMatching.same(ObservedOffer.copyOf(actual), TradeSimulator.fingerprint(prediction)),
                                     "Offer mismatch level=" + level + " seed=" + seed + " round=" + round);
@@ -108,7 +117,7 @@ public class VtpGameTest implements FabricClientGameTest {
             }
             // Another villager consumes the same shared sequence while A keeps its old offers.
             server.runOnServer(mc -> {
-                Villager other = new Villager(EntityTypes.VILLAGER, mc.overworld());
+                Villager other = newVillager(mc.overworld());
                 other.setNoAi(true); other.setVillagerData(spawn.data());
                 for (int i = 0; i < 8; i++) {
                     other.setVillagerData(other.getVillagerData().withProfession(
@@ -121,7 +130,7 @@ public class VtpGameTest implements FabricClientGameTest {
                     PredictionEngine.getForecastRounds(mc.getSingleplayerServer().overworld().getSeed(),
                             spawn.data().profession(), 1, 1).getFirst()));
             var nextActual = server.computeOnServer(mc -> {
-                Villager other = new Villager(EntityTypes.VILLAGER, mc.overworld());
+                Villager other = newVillager(mc.overworld());
                 other.setNoAi(true); other.setVillagerData(spawn.data());
                 return ObservedOffer.copyOf(other.getOffers());
             });

@@ -1,5 +1,7 @@
 package net.manaz.vtp;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.manaz.vtp.gui.*;
 import net.manaz.vtp.render.*;
@@ -10,7 +12,7 @@ import net.minecraft.client.input.*;
 import java.util.*;
 
 final class VtpUiGameTest {
-    private static final MouseButtonInfo LEFT = new MouseButtonInfo(0, 0);
+    private static final MouseButtonInfo LEFT = new MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
     private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
 
     static void click(Screen screen, String label) {
@@ -50,9 +52,9 @@ final class VtpUiGameTest {
             context.takeScreenshot("ui-hud-scale-" + scale);
             context.setScreen(VtpSettingsScreen::new);
             context.waitTicks(2);
-            for (String tab : new String[]{"Settings", "Targets", "Sequence", "Trades", "Calibrate"}) {
+            for (String tab : new String[]{"Targets", "Calibrate", "Sequence", "Trades", "Settings"}) {
                 context.runOnClient(mc -> {
-                    Screen screen = mc.gui.screen();
+                    Screen screen = ClientCompat.screen(mc);
                     boolean active = screen.children().stream().filter(e -> e instanceof Button).map(e -> (Button) e)
                             .anyMatch(b -> b.getMessage().getString().equals(tab) && b.active);
                     if (active) click(screen, tab);
@@ -73,10 +75,10 @@ final class VtpUiGameTest {
         context.waitTicks(15);
         context.setScreen(VtpSettingsScreen::new);
         context.waitTicks(2);
-        for (String tab : new String[]{"Settings", "Targets", "Sequence", "Trades", "Calibrate"}) {
+        for (String tab : new String[]{"Targets", "Calibrate", "Sequence", "Trades", "Settings"}) {
             context.runOnClient(mc -> {
-                click(mc.gui.screen(), tab);
-                checkLayout(mc.gui.screen(), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                click(ClientCompat.screen(mc), tab);
+                checkLayout(ClientCompat.screen(mc), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
             });
         }
         context.takeScreenshot("ui-minimum-size");
@@ -85,13 +87,14 @@ final class VtpUiGameTest {
         context.setScreen(() -> new VtpSettingsScreen() { @Override protected boolean singleplayer() { return false; } });
         context.waitTicks(2);
         context.runOnClient(mc -> {
-            checkLayout(mc.gui.screen(), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
-            click(mc.gui.screen(), "Choose enchantment");
+            checkLayout(ClientCompat.screen(mc), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+            click(ClientCompat.screen(mc), "Calibrate");
+            click(ClientCompat.screen(mc), "Choose enchantment");
         });
         context.waitTicks(2);
         context.takeScreenshot("ui-enchantment-picker");
         context.runOnClient(mc -> {
-            Screen screen = mc.gui.screen();
+            Screen screen = ClientCompat.screen(mc);
             checkLayout(screen, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
             EditBox search = screen.children().stream().filter(e -> e instanceof EditBox).map(e -> (EditBox) e).findFirst().orElseThrow();
             search.setValue("mending");
@@ -101,15 +104,15 @@ final class VtpUiGameTest {
         });
         context.waitTicks(2);
         context.runOnClient(mc -> {
-            click(mc.gui.screen(), "Add observation");
-            click(mc.gui.screen(), "Add no book");
+            click(ClientCompat.screen(mc), "Add observation");
+            click(ClientCompat.screen(mc), "Add no book");
             check(net.manaz.vtp.prediction.CalibrationListStore.size() == 2, "Calibration composer lost observations");
-            checkLayout(mc.gui.screen(), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+            checkLayout(ClientCompat.screen(mc), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         });
         context.takeScreenshot("ui-calibration-minimum");
         context.runOnClient(mc -> {
-            click(mc.gui.screen(), "Targets");
-            var screen = mc.gui.screen();
+            click(ClientCompat.screen(mc), "Targets");
+            var screen = ClientCompat.screen(mc);
             var search = screen.children().stream().filter(e -> e instanceof EditBox).map(e -> (EditBox) e)
                     .filter(e -> e.getMessage().getString().equals("Search enchantments")).findFirst().orElseThrow();
             search.setValue("unbreaking");
@@ -123,10 +126,10 @@ final class VtpUiGameTest {
             checkLayout(screen, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         });
         context.takeScreenshot("ui-targets-minimum");
-        context.runOnClient(mc -> click(mc.gui.screen(), "Done"));
+        context.runOnClient(mc -> click(ClientCompat.screen(mc), "Done"));
         context.waitTicks(2);
         context.runOnClient(mc -> {
-            check(mc.gui.screen() == null, "Done did not close settings");
+            check(ClientCompat.screen(mc) == null, "Done did not close settings");
             check(HudView.current() != null && HudView.current().trades().getFirst().label().equals("Current"),
                     "HUD current label changed");
             check(HudView.current().trades().stream().noneMatch(r -> r.label().equals("+0") || r.label().equals("now")),

@@ -1,5 +1,7 @@
 package net.manaz.vtp.gui;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.manaz.vtp.VtpPersistence;
 import net.manaz.vtp.mixin.accessor.VillagerTradeAccessor;
 import net.manaz.vtp.prediction.*;
@@ -18,13 +20,12 @@ import net.minecraft.world.entity.npc.villager.*;
 import net.minecraft.world.item.*;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.trading.*;
-import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import java.util.*;
 import java.util.function.Consumer;
 
 /** Dark tooltip styling with native controls, item icons and Minecraft GUI scaling. */
 public class VtpSettingsScreen extends Screen {
-    private static final String[] TABS = {"Settings", "Targets", "Sequence", "Trades", "Calibrate"};
+    private static final String[] TABS = {"Targets", "Calibrate", "Sequence", "Trades", "Settings"};
     private static final String[] LEVELS = {"", "Novice", "Apprentice", "Journeyman", "Expert", "Master"};
     private static final String[] PROFESSIONS = {"armorer", "butcher", "cartographer", "cleric", "farmer",
             "fisherman", "fletcher", "leatherworker", "librarian", "mason", "shepherd", "toolsmith", "weaponsmith"};
@@ -37,7 +38,10 @@ public class VtpSettingsScreen extends Screen {
     private final Map<String, Integer> scrolls = new HashMap<>();
     private List<Holder<Enchantment>> enchantments = List.of();
     private Holder<Enchantment> chosen;
-    private String query = "", price = "", maxSearch = String.valueOf(PredictionEngine.getMaxRerolls());
+    private String query = "", maxSearch = String.valueOf(PredictionEngine.getMaxRerolls());
+    private Holder<Enchantment> observationChosen;
+    private int observationLevel = 1;
+    private String observationPrice = "", observationBinding;
     private String seedText = SeedProvider.getSeed().isPresent() ? String.valueOf(SeedProvider.getSeed().orElseThrow()) : "";
     private String message = "";
     private int chosenLevel = 1, targetIndex = -1, observationIndex = -1, sequenceLevel = 1, tradeLevel = 0;
@@ -71,16 +75,16 @@ public class VtpSettingsScreen extends Screen {
             });
             button.active = i != tab;
             button.selected(i == tab).icon(tabWidth >= 90 ? switch (i) {
-                case 0 -> Items.COMPARATOR; case 1 -> Items.ENCHANTED_BOOK; case 2 -> Items.LECTERN;
-                case 3 -> Items.EMERALD; default -> Items.COMPASS;
+                case 0 -> Items.ENCHANTED_BOOK; case 1 -> Items.COMPASS; case 2 -> Items.LECTERN;
+                case 3 -> Items.EMERALD; default -> Items.COMPARATOR;
             } : null);
         }
         switch (tab) {
-            case 0 -> settings();
-            case 1 -> targets();
+            case 0 -> targets();
+            case 1 -> calibration();
             case 2 -> sequence();
             case 3 -> trades();
-            case 4 -> calibration();
+            case 4 -> settings();
         }
         button("Done", wx + ww - 90, wy + wh - 27, 80, this::onClose);
         viewRevision = PredictionEngine.revision();
@@ -114,7 +118,7 @@ public class VtpSettingsScreen extends Screen {
                 this::addRenderableWidget, this::addRenderableOnly);
         label("General", right, top, column);
         button("HUD settings", right, top + 14, column,
-                () -> minecraft.gui.setScreen(new VtpHudSettingsScreen(this))).icon(Items.SPYGLASS);
+                () -> ClientCompat.setScreen(minecraft, new VtpHudSettingsScreen(this))).icon(Items.SPYGLASS);
         int half = (column - 4) / 2;
         label("Search limit", right, top + 38, half);
         input("Maximum rerolls to search (1–10000)", maxSearch, "500", right, top + 50, half, value -> maxSearch = value);
@@ -122,18 +126,26 @@ public class VtpSettingsScreen extends Screen {
             VillagerHudRenderer.setRomanNumerals(!VillagerHudRenderer.isRomanNumerals()); saveSettings(); rebuildWidgets();
         }).setTooltip(Tooltip.create(Component.literal("Switch between numeric and Roman enchantment levels.")));
         label(singleplayer() ? "World seed (auto)" : "World seed", right, top + 76, column);
-        EditBox seed = input("World seed; required on multiplayer", seedText, "Enter seed", right, top + 88,
-                singleplayer() ? column : column - 48, value -> seedText = value);
+        VtpSeedBox seed = addRenderableWidget(new VtpSeedBox(font, right, top + 88, column - 48));
+        seed.setMaxLength(80); seed.setValue(seedText); seed.setHint(Component.literal("Enter seed"));
+        seed.setResponder(this::updateSeed);
+        seed.setTooltip(Tooltip.create(Component.literal("Saved automatically when a valid seed is entered.")));
         seed.active = !singleplayer();
-        if (!singleplayer()) button("Set", right + column - 44, top + 88, 44, () -> {
-            try {
-                VtpPersistence.changeSeed(Long.parseLong(seedText.trim()));
-                message = "Seed saved."; rebuildWidgets();
-            } catch (NumberFormatException e) { message = "Enter a valid world seed."; }
-        });
+        button(SeedProvider.isSeedVisible() ? "Hide" : "Show", right + column - 44, top + 88, 44, () -> {
+            SeedProvider.setSeedVisible(!SeedProvider.isSeedVisible()); saveSettings(); rebuildWidgets();
+        }).setTooltip(Tooltip.create(Component.literal(SeedProvider.isSeedVisible() ? "Hide world seed" : "Show world seed")));
         button("Reset calibration", right, top + 112, column, () -> {
             VillagerTracker.resetCalibration(); VtpPersistence.saveCurrentWorldState(); message = "Calibration reset.";
         }).active = !singleplayer();
+    }
+
+    private void updateSeed(String value) {
+        seedText = value;
+        if (singleplayer()) return;
+        try {
+            VtpPersistence.changeSeed(Long.parseLong(value.trim()));
+            message = "Seed saved.";
+        } catch (NumberFormatException e) { message = "Enter a valid numeric world seed."; }
     }
 
     private void loadEnchantments() {
@@ -244,9 +256,9 @@ public class VtpSettingsScreen extends Screen {
                 : Tooltip.create(Component.literal(chosen.value().description().getString() + " " + VillagerHudRenderer.fmtLvl(chosenLevel))));
     }
     private Integer parsePrice() {
-        if (price.isBlank()) return -1;
+        if (observationPrice.isBlank()) return -1;
         try {
-            int value = Integer.parseInt(price.trim());
+            int value = Integer.parseInt(observationPrice.trim());
             if (value >= 1 && value <= 64) return value;
         } catch (NumberFormatException ignored) {}
         message = "Price must be 1–64, or blank."; return null;
@@ -375,7 +387,7 @@ public class VtpSettingsScreen extends Screen {
         rows("trades", entries);
     }
     private static ItemStack cost(TradeCost cost) {
-        int count = cost.count() instanceof ConstantValue value ? (int) value.value() : 1;
+        int count = net.manaz.vtp.compat.TradeCompat.baseCostCount(cost);
         return new ItemStack(cost.item().value(), Math.max(1, count));
     }
 
@@ -386,6 +398,7 @@ public class VtpSettingsScreen extends Screen {
             label("You can inspect the trade sequence in the Sequence tab.", left, top + 48, ww - 20);
             return;
         }
+        restoreObservationDraft();
         label("Observed rounds", left, top, column);
         list("observations", left, top + 16, column, bottom - top - 64, "Observed rounds or calibration matches");
         int half = (column - 4) / 2;
@@ -404,20 +417,20 @@ public class VtpSettingsScreen extends Screen {
         });
 
         label("Enchantment", right, top, column);
-        Button choose = button(chosen == null ? "Choose enchantment" : VtpUi.fit(font, chosen.value().description().getString(), column - 10),
-                right, top + 14, column, () -> minecraft.gui.setScreen(new EnchantmentPickerScreen(this, value -> {
-                    chosen = value; chosenLevel = Math.min(chosenLevel, value.value().getMaxLevel());
+        Button choose = button(observationChosen == null ? "Choose enchantment" : VtpUi.fit(font, observationChosen.value().description().getString(), column - 10),
+                right, top + 14, column, () -> ClientCompat.setScreen(minecraft, new EnchantmentPickerScreen(this, value -> {
+                    observationChosen = value; observationLevel = Math.min(observationLevel, value.value().getMaxLevel());
                 })));
-        if (chosen != null) choose.setTooltip(Tooltip.create(chosen.value().description()));
-        button("Level: " + VillagerHudRenderer.fmtLvl(chosenLevel), right, top + 38, column, () -> {
-            chosenLevel = chosenLevel % chosen.value().getMaxLevel() + 1; rebuildWidgets();
-        }).active = chosen != null && chosen.value().getMaxLevel() > 1;
-        input("Optional base emerald price (1–64)", price, "Base price: any", right, top + 62, column, value -> price = value);
-        button("Add observation", right, top + 86, column, this::addObservation).active = chosen != null;
+        if (observationChosen != null) choose.setTooltip(Tooltip.create(observationChosen.value().description()));
+        button("Level: " + VillagerHudRenderer.fmtLvl(observationLevel), right, top + 38, column, () -> {
+            observationLevel = observationLevel % observationChosen.value().getMaxLevel() + 1; rebuildWidgets();
+        }).active = observationChosen != null && observationChosen.value().getMaxLevel() > 1;
+        input("Optional base emerald price (1–64)", observationPrice, "Base price: any", right, top + 62, column, value -> observationPrice = value);
+        button("Add observation", right, top + 86, column, this::addObservation).active = observationChosen != null;
         button("Add no book", right, top + 110, column, () -> {
             if (CalibrationListStore.size() >= 100) { message = "Maximum 100 observations."; return; }
             CalibrationListStore.add(CalibrationListStore.Observation.missing());
-            matches = List.of(); showingMatches = false; observationRows(); message = "Observation added.";
+            checkCalibration(false);
         });
         observationRows();
     }
@@ -425,9 +438,28 @@ public class VtpSettingsScreen extends Screen {
         if (CalibrationListStore.size() >= 100) { message = "Maximum 100 observations."; return; }
         Integer p = parsePrice();
         if (p == null) return;
-        if (chosen == null) { message = "Select an enchantment first."; return; }
-        CalibrationListStore.add(CalibrationListStore.Observation.ofTrade(chosen.unwrapKey().orElseThrow(), chosenLevel, p));
-        matches = List.of(); showingMatches = false; observationRows(); message = "Observation added.";
+        if (observationChosen == null) { message = "Select an enchantment first."; return; }
+        CalibrationListStore.add(CalibrationListStore.Observation.ofTrade(observationChosen.unwrapKey().orElseThrow(), observationLevel, p));
+        checkCalibration(false);
+    }
+
+    private void restoreObservationDraft() {
+        String scope = CalibrationListStore.currentBinding();
+        if (scope.equals(observationBinding)) return;
+        observationBinding = scope; observationChosen = null; observationLevel = 1; observationPrice = "";
+        CalibrationDraftStore.get(scope).ifPresent(draft -> {
+            observationChosen = TradeDataLoader.getTradeableEnchantments().stream()
+                    .filter(e -> e.unwrapKey().orElseThrow().identifier().toString().equals(draft.enchantment())).findFirst().orElse(null);
+            observationLevel = observationChosen == null ? 1 : Math.clamp(draft.level(), 1, observationChosen.value().getMaxLevel());
+            observationPrice = draft.price();
+        });
+    }
+
+    private void rememberObservationDraft() {
+        if (observationBinding != null && (observationChosen != null || !observationPrice.isEmpty()))
+            CalibrationDraftStore.save(observationBinding, new CalibrationDraftStore.Draft(
+                    observationChosen == null ? "" : observationChosen.unwrapKey().orElseThrow().identifier().toString(),
+                    observationLevel, observationPrice));
     }
     private void observationRows() {
         if (!lists.containsKey("observations")) return;
@@ -437,7 +469,7 @@ public class VtpSettingsScreen extends Screen {
             for (int round : matches) entries.add(VtpList.Entry.text("Confirm round " + round, () -> {
                 var data = VillagerTracker.getLastVillagerData().orElse(null);
                 boolean ok = data != null && CalibrationService.confirm(VillagerTracker.getLastVillagerUuid(), data, round);
-                message = ok ? "Calibration applied." : "Observation changed; search again.";
+                message = ok ? "Sequence calibrated." : "Observation changed; search again.";
                 showingMatches = false; matches = List.of(); rebuildWidgets();
             }));
         } else {
@@ -445,9 +477,15 @@ public class VtpSettingsScreen extends Screen {
             for (int i = 0; i < observations.size(); i++) {
                 int index = i;
                 var o = observations.get(i);
-                String value = o.noTrade() ? "No book" : VtpUi.name(o.enchantment().identifier().toString()) + " " + VillagerHudRenderer.fmtLvl(o.enchantmentLevel());
-                entries.add(new VtpList.Entry((i + 1) + ". " + value, o.price() >= 0 ? o.price() + " em" : "",
-                        o.noTrade() ? VtpIcons.of(Items.BOOK) : VtpIcons.book(), List.of(), value, observationIndex == i, () -> { observationIndex = index; observationRows(); }));
+                long books = o.offers().stream().mapToLong(offer -> offer.books().size()).sum();
+                String value = o.noTrade() ? "No book" : books > 1 ? books + " enchanted books"
+                        : VtpUi.name(o.enchantment().identifier().toString()) + " " + VillagerHudRenderer.fmtLvl(o.enchantmentLevel());
+                String tip = o.offers().isEmpty() ? value : o.offers().stream().flatMap(offer -> offer.books().stream()
+                        .map(book -> VtpUi.name(book.key()) + " " + VillagerHudRenderer.fmtLvl(book.level()) + " · " + offer.basePrice() + " emeralds"))
+                        .collect(java.util.stream.Collectors.joining("\n"));
+                entries.add(new VtpList.Entry((i + 1) + ". " + value, books <= 1 && o.price() >= 0 ? o.price() + " em" : "",
+                        o.noTrade() ? VtpIcons.of(Items.BOOK) : VtpIcons.book(), List.of(), tip.isEmpty() ? value : tip,
+                        observationIndex == i, () -> { observationIndex = index; observationRows(); }));
             }
         }
         rows("observations", entries);
@@ -458,18 +496,21 @@ public class VtpSettingsScreen extends Screen {
         String problem = CalibrationService.problem(data);
         if (!problem.isEmpty()) { message = problem; return; }
         if (CalibrationListStore.toSpecs().isEmpty()) { message = "Add observations from this villager."; return; }
-        UUID uuid = VillagerTracker.getLastVillagerUuid();
-        matches = CalibrationService.search(uuid, data, CalibrationListStore.toSpecs());
-        if (matches.isEmpty()) message = "No match. Check observations and seed.";
-        else if (matches.size() == 1) {
-            message = CalibrationService.confirm(uuid, data, matches.getFirst()) ? "Calibration applied." : "Observation changed; search again.";
-            matches = List.of();
-        } else {
-            showingMatches = true; message = matches.size() + " matches. Select a round to confirm."; rebuildWidgets();
-        }
+        checkCalibration(true);
+    }
+
+    private void checkCalibration(boolean showCandidates) {
+        var result = CalibrationService.checkObservations(VillagerTracker.getLastVillagerUuid(),
+                VillagerTracker.getLastVillagerData().orElse(null));
+        matches = result.matches(); message = result.message();
+        showingMatches = showCandidates && matches.size() > 1;
+        observationRows();
     }
 
     @Override public void tick() {
+        if (tab == 1 && observationBinding != null && !observationBinding.equals(CalibrationListStore.currentBinding())) {
+            message = ""; matches = List.of(); showingMatches = false; rebuildWidgets();
+        }
         if (tab == 2 && viewRevision != PredictionEngine.revision()) {
             sequenceRows(); viewRevision = PredictionEngine.revision();
         }
@@ -486,7 +527,9 @@ public class VtpSettingsScreen extends Screen {
         }
         g.fill(left, wy + wh - 32, wx + ww - 10, wy + wh - 31, VtpUi.EDGE);
         String footer = !message.isEmpty() ? message : tab == 2 ? "Prices shown before discounts."
-                : tab == 4 && !singleplayer() ? "Add consecutive rounds from one villager." : tab == 0 ? trackingStatus() : "";
+                : tab == 1 && !singleplayer() ? CalibrationListStore.feedback().isEmpty()
+                        ? "Add consecutive rounds from one villager." : CalibrationListStore.feedback()
+                : tab == 4 ? trackingStatus() : "";
         VtpUi.text(g, font, footer, left, wy + wh - 20, ww - 112, VtpUi.MUTED, mx, my);
         super.extractRenderState(g, mx, my, delta);
     }
@@ -494,7 +537,7 @@ public class VtpSettingsScreen extends Screen {
         return VillagerTracker.getLastVillagerData().map(d -> VillagerTracker.status(VillagerTracker.getLastVillagerUuid(), d))
                 .orElse("Look at a villager.");
     }
-    @Override public void removed() { saveSettings(); super.removed(); }
+    @Override public void removed() { rememberObservationDraft(); saveSettings(); super.removed(); }
     private void saveSettings() { VtpPersistence.saveGlobalSettings(); }
     @Override public void onClose() {
         try {
@@ -502,7 +545,7 @@ public class VtpSettingsScreen extends Screen {
             if (max < 1 || max > 10000) throw new NumberFormatException();
             if (max != PredictionEngine.getMaxRerolls()) PredictionEngine.setMaxRerolls(max);
         } catch (NumberFormatException e) {
-            message = "Search limit must be 1–10000."; tab = 0; rebuildWidgets(); return;
+            message = "Search limit must be 1–10000."; tab = 4; rebuildWidgets(); return;
         }
         saveSettings(); VtpPersistence.saveCurrentWorldState(); super.onClose();
     }

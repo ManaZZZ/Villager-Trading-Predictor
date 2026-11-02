@@ -1,8 +1,7 @@
 {
-  "category.villager-trading-predictor": "Villager Trading Predictor",
+  "key.category.villager-trading-predictor.category": "Villager Trading Predictor",
+  "key.villager-trading-predictor.toggle": "Open VTP Settings GUI",
+  "key.villager-trading-predictor.toggle_overlay": "Toggle VTP Overlay",
   "category.villager-trading-predictor.category": "Villager Trading Predictor",
-  "key.villager-trading-predictor.toggle": "Toggle VTP Overlay",
-  "key.villager-trading-predictor.open_gui": "Open VTP Settings GUI",
-  "key.villager-trading-predictor.reroll_up": "VTP Reroll Count +1",
-  "key.villager-trading-predictor.reroll_down": "VTP Reroll Count -1"
+  "category.villager-trading-predictor": "Villager Trading Predictor"
 }

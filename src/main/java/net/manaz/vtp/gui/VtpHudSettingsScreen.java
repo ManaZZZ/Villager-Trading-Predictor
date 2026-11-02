@@ -1,5 +1,7 @@
 package net.manaz.vtp.gui;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.manaz.vtp.VtpPersistence;
 import net.manaz.vtp.render.*;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -102,6 +104,6 @@ public final class VtpHudSettingsScreen extends Screen {
                 x + 10, y + 188, w - 20, VtpUi.MUTED, mx, my);
         super.extractRenderState(g, mx, my, delta);
     }
-    @Override public void onClose() { minecraft.gui.setScreen(parent); }
+    @Override public void onClose() { ClientCompat.setScreen(minecraft, parent); }
     @Override public boolean isPauseScreen() { return false; }
 }

@@ -1,0 +1,43 @@
+// Reserve one version per packaged universal JAR; non-packaging tasks do not consume numbers.
+def releasePrefix = project.mod_version.toString()
+def buildNumber = project.build_number.toInteger()
+if (buildNumber < 1) throw new GradleException('build_number must be a positive integer')
+def artifactName = { number -> "VTP-${releasePrefix}.${number}-mc26-universal.jar" }
+while (file("build/libs/${artifactName(buildNumber)}").exists()
+        || file("releases/${artifactName(buildNumber)}").exists()) {
+    buildNumber++
+}
+project.version = "${releasePrefix}.${buildNumber}"
+def retainedJar = file("releases/${artifactName(buildNumber)}")
+def releaseVersion = project.version.toString()
+def versionLock = file('.gradle/vtp-build-version.lock')
+def propsFile = file('gradle.properties')
+
+tasks.withType(Jar).configureEach {
+    if (name != 'universalJar') return
+    outputs.file(retainedJar)
+    doFirst {
+        versionLock.parentFile.mkdirs()
+        new RandomAccessFile(versionLock, 'rw').withCloseable { handle ->
+            handle.channel.lock().withCloseable { lock ->
+                def lines = propsFile.readLines('UTF-8')
+                def index = lines.findIndexOf { it.startsWith('build_number=') }
+                if (index < 0) throw new GradleException('gradle.properties is missing build_number')
+                if (lines[index].substring('build_number='.length()).toInteger() > buildNumber) {
+                    throw new GradleException('Another build reserved this version. Run the build again.')
+                }
+                if (archiveFile.get().asFile.exists() || retainedJar.exists()) {
+                    throw new GradleException("Refusing to overwrite existing VTP version ${releaseVersion}")
+                }
+                lines[index] = "build_number=${buildNumber + 1}"
+                propsFile.setText(lines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+            }
+        }
+    }
+    doLast {
+        java.nio.file.Files.createDirectories(retainedJar.parentFile.toPath())
+        // No REPLACE_EXISTING: retained releases are immutable even if a counter is reset.
+        java.nio.file.Files.copy(archiveFile.get().asFile.toPath(), retainedJar.toPath())
+        logger.lifecycle("Built VTP ${releaseVersion}; retained release: ${retainedJar}")
+    }
+}

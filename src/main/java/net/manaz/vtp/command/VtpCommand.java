@@ -1,5 +1,7 @@
 package net.manaz.vtp.command;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -16,7 +18,6 @@ import net.manaz.vtp.prediction.PredictionEngine;
 import net.manaz.vtp.render.VillagerHudRenderer;
 import net.manaz.vtp.render.VillagerTracker;
 import net.manaz.vtp.seed.SeedProvider;
-import net.manaz.vtp.seed.ServerSeedStore;
 import net.manaz.vtp.trade.TradeDataLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
@@ -84,7 +85,7 @@ public class VtpCommand {
                     // /vtp  (no args) → open settings GUI
                     .executes(ctx -> {
                         Minecraft mc = Minecraft.getInstance();
-                        mc.execute(() -> mc.gui.setScreen(new VtpSettingsScreen()));
+                        mc.execute(() -> ClientCompat.setScreen(mc, new VtpSettingsScreen()));
                         return 1;
                     })
                     // /vtp seed [value]
@@ -93,11 +94,6 @@ public class VtpCommand {
                                     .executes(ctx -> {
                                         long seed = LongArgumentType.getLong(ctx, "value");
                                         VtpPersistence.changeSeed(seed);
-                                        // Persist seed for this server so it auto-restores on reconnect
-                                        var serverData = Minecraft.getInstance().getCurrentServer();
-                                        if (serverData != null) {
-                                            ServerSeedStore.saveSeedForServer(serverData.ip, seed);
-                                        }
                                         ctx.getSource().sendFeedback(
                                                 Component.literal("[VTP] Seed set to: " + seed));
                                         return 1;

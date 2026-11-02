@@ -40,6 +40,7 @@ public final class VillagerTracker {
         boolean pending, knownBoundary, hasObservation, everObserved, tradeLocked;
         long revision;
         List<ObservedOffer> observed = List.of();
+        List<ObservedOffer> calibrationOffers = List.of();
         final Map<Integer, Integer> rounds = new HashMap<>();
         final Map<Integer, List<OfferData>> levelOffers = new HashMap<>();
     }
@@ -54,7 +55,7 @@ public final class VillagerTracker {
         boolean changed = s.profession != null && !s.profession.equals(profession);
         if (changed || s.level != data.level()) s.revision++;
         if (changed) {
-            s.observed = List.of(); s.hasObservation = false; s.observedLevel = -1; s.tradeLocked = false;
+            s.observed = List.of(); s.calibrationOffers = List.of(); s.hasObservation = false; s.observedLevel = -1; s.tradeLocked = false;
             s.rounds.clear(); s.levelOffers.clear(); s.round = -1;
             s.pending = hasProfession(data); s.knownBoundary = true;
         } else if (s.profession == null || s.level != data.level()) {
@@ -88,8 +89,8 @@ public final class VillagerTracker {
     public static void observe(UUID uuid, VillagerData data, List<ObservedOffer> offers, boolean authoritative) {
         update(uuid, data);
         State s = states.get(uuid);
-        if (!s.pending && s.hasObservation && OfferMatching.same(s.observed, offers)
-                && (authoritative || synchronizedSequences.contains(sequenceKey(data.profession(), data.level())))) return;
+        if (!s.pending && s.hasObservation && s.observedLevel == data.level()
+                && OfferMatching.same(s.observed, offers)) return;
         List<ObservedOffer> newOffers = s.observedLevel > 0 && data.level() > s.observedLevel
                 ? OfferMatching.added(s.observed, offers) : offers;
         boolean canAssignLevel = data.level() == 1 || (s.observedLevel > 0 && data.level() == s.observedLevel + 1);
@@ -114,6 +115,7 @@ public final class VillagerTracker {
         s.everObserved = true; s.revision++; PredictionEngine.changed();
         s.round = match; s.pending = false; s.knownBoundary = false;
         s.observed = List.copyOf(offers); s.hasObservation = true; s.observedLevel = data.level();
+        s.calibrationOffers = canAssignLevel ? List.copyOf(newOffers) : List.of();
         if (canAssignLevel) {
             s.levelOffers.put(data.level(), bookData(newOffers));
             if (match >= 0) s.rounds.put(data.level(), match);
@@ -130,7 +132,7 @@ public final class VillagerTracker {
         if (!s.pending) {
             s.revision++; PredictionEngine.changed();
             s.pending = true; s.knownBoundary = s.hasObservation;
-            s.observed = List.of(); s.hasObservation = false; s.observedLevel = -1; s.tradeLocked = false;
+            s.observed = List.of(); s.calibrationOffers = List.of(); s.hasObservation = false; s.observedLevel = -1; s.tradeLocked = false;
             s.round = -1; s.levelOffers.clear(); s.rounds.clear();
         }
     }
@@ -163,6 +165,14 @@ public final class VillagerTracker {
     public static Optional<VillagerData> getLastVillagerData() { return Optional.ofNullable(lastVillagerData); }
     public static UUID getLastVillagerUuid() { return lastVillagerUuid; }
     public static UUID getMenuVillagerUuid() { return menuUuid; }
+    /** Only a received novice round or a tier added after an observed level-up can be calibrated. */
+    public static Optional<List<ObservedOffer>> getCalibrationOffers(UUID uuid) {
+        State s = states.get(uuid);
+        if (s == null || s.pending || !s.hasObservation || s.data == null || s.observedLevel != s.data.level())
+            return Optional.empty();
+        List<ObservedOffer> offers = s.data.level() == 1 ? s.observed : s.calibrationOffers;
+        return offers.isEmpty() ? Optional.empty() : Optional.of(offers);
+    }
     public static Optional<VillagerData> getData(UUID uuid) {
         State s = states.get(uuid); return Optional.ofNullable(s == null ? null : s.data);
     }

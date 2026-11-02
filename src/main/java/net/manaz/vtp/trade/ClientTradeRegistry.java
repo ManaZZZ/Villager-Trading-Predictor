@@ -36,6 +36,7 @@ import java.util.*;
 public class ClientTradeRegistry {
 
     private static final Map<ResourceKey<TradeSet>, TradeSet> tradeSetCache = new HashMap<>();
+    private static final Map<TradeSet, HolderLookup.Provider> tradeSetLookups = new IdentityHashMap<>();
     private static RegistryAccess clientAccess = null;
     private static boolean initialized = false;
 
@@ -53,6 +54,8 @@ public class ClientTradeRegistry {
     }
 
     public static Optional<TradeSet> getTradeSet(ResourceKey<TradeSet> key) {
+        // Retry here if an earlier init call had no loaded level.
+        if (!initialized) init();
         if (!initialized || clientAccess == null) return Optional.empty();
 
         if (tradeSetCache.containsKey(key)) {
@@ -73,11 +76,16 @@ public class ClientTradeRegistry {
 
     public static void clear() {
         tradeSetCache.clear();
+        tradeSetLookups.clear();
         clientAccess = null;
         initialized = false;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
+    static Optional<HolderLookup.Provider> getLookup(TradeSet tradeSet) {
+        return Optional.ofNullable(tradeSetLookups.get(tradeSet));
+    }
 
     private static Optional<TradeSet> loadTradeSet(ResourceKey<TradeSet> key) {
         String tsPath = dataPath(key, "trade_set");
@@ -101,8 +109,16 @@ public class ClientTradeRegistry {
         VillagerTradingPredictor.LOGGER.info("[VTP] VillagerTrade registry: {} entries, {} tags",
                 vtReg.size(), tagBindings.size());
 
-        RegistryOps<JsonElement> tsOps = RegistryOps.create(JsonOps.INSTANCE, buildInfoLookup(vtReg));
-        return decodeFromPath(tsPath, TradeSet.CODEC, tsOps);
+        HolderLookup.Provider lookupProvider = HolderLookup.Provider.create(
+                java.util.stream.Stream.concat(
+                        clientAccess.listRegistries().filter(reg -> !reg.key().equals(Registries.VILLAGER_TRADE)),
+                        java.util.stream.Stream.of(vtReg)));
+        RegistryOps<JsonElement> tsOps = RegistryOps.create(JsonOps.INSTANCE, lookupProvider);
+        Optional<TradeSet> result = decodeFromPath(tsPath, TradeSet.CODEC, tsOps);
+        // HolderSets belong to this local registry, not the server/client trade registry.
+        // Keep its lookup for subsequent validation and serialization of these definitions.
+        result.ifPresent(tradeSet -> tradeSetLookups.put(tradeSet, lookupProvider));
+        return result;
     }
 
     /**
@@ -199,31 +215,6 @@ public class ClientTradeRegistry {
         Registry.register(vtReg, loc, vt.get());
         // Get the holder after registration
         return vtReg.get(vtKey).map(h -> h);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Build a RegistryInfoLookup that serves our local VillagerTrade registry for
-     * VILLAGER_TRADE and delegates to the client registry for everything else.
-     */
-    @SuppressWarnings("unchecked")
-    private static RegistryOps.RegistryInfoLookup buildInfoLookup(MappedRegistry<VillagerTrade> vtReg) {
-        return new RegistryOps.RegistryInfoLookup() {
-            @Override
-            public <T> Optional<RegistryOps.RegistryInfo<T>> lookup(ResourceKey<? extends Registry<? extends T>> registryKey) {
-                if (registryKey.equals(Registries.VILLAGER_TRADE)) {
-                    RegistryOps.RegistryInfo<T> info = (RegistryOps.RegistryInfo<T>)
-                            new RegistryOps.RegistryInfo<>(vtReg, vtReg, vtReg.registryLifecycle());
-                    return Optional.of(info);
-                }
-                @SuppressWarnings("unchecked")
-                ResourceKey<? extends Registry<T>> narrowed =
-                        (ResourceKey<? extends Registry<T>>) registryKey;
-                return clientAccess.lookup(narrowed).map(reg ->
-                        new RegistryOps.RegistryInfo<>(reg, reg, reg.registryLifecycle()));
-            }
-        };
     }
 
     // ─────────────────────────────────────────────────────────────────────────

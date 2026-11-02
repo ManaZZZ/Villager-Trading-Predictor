@@ -1,5 +1,7 @@
 package net.manaz.vtp;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.manaz.vtp.gui.*;
 import net.manaz.vtp.render.*;
@@ -11,7 +13,7 @@ import net.minecraft.world.entity.npc.villager.Villager;
 import static net.manaz.vtp.VtpUiGameTest.*;
 
 final class VtpCustomizationGameTest {
-    private static final MouseButtonInfo LEFT = new MouseButtonInfo(0, 0);
+    private static final MouseButtonInfo LEFT = new MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
     private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
     private static Button button(Screen screen, String label) {
         return screen.children().stream().filter(e -> e instanceof Button).map(e -> (Button) e)
@@ -23,7 +25,7 @@ final class VtpCustomizationGameTest {
     }
     static void checkDialogs(ClientGameTestContext context, int scale) {
         context.runOnClient(mc -> {
-            var screen = mc.gui.screen();
+            var screen = ClientCompat.screen(mc);
             check(screen.children().stream().filter(e -> e instanceof Button).map(e -> (Button) e)
                     .noneMatch(e -> e.getMessage().getString().equals("Accent color...")
                             || e.getMessage().getString().equals("HUD size...") || e.getMessage().getString().equals("HUD visibility...")),
@@ -36,30 +38,30 @@ final class VtpCustomizationGameTest {
             check(hue.getX() == plane.getX() && hue.getWidth() == plane.getWidth()
                     && hue.getY() == plane.getY() + plane.getHeight() + 4, "Hue strip is not aligned below the square");
             check(plane.getY() == button(screen, "HUD settings").getY()
-                    && plane.getX() == button(screen, "Settings").getX(), "Color picker is not aligned with the settings");
+                    && plane.getX() == button(screen, "Targets").getX(), "Color picker is not aligned with the settings");
             var reset = button(screen, "Reset");
             check(reset.getX() + reset.getWidth() == button(screen, "HUD settings").getX() - 8,
                     "Picker does not fill the settings column");
             for (String channel : new String[]{"Red", "Green", "Blue"}) input(screen, channel);
             click(screen, "HUD settings");
-            var toggle = button(mc.gui.screen(), "HUD: ON");
+            var toggle = button(ClientCompat.screen(mc), "HUD: ON");
             int panelTop = toggle.getY() - 28;
             check(Math.abs(2 * panelTop + 228 - mc.getWindow().getGuiScaledHeight()) <= 1, "HUD settings isn't vertically centered");
-            checkLayout(mc.gui.screen(), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+            checkLayout(ClientCompat.screen(mc), mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
             for (var mode : HudVisibility.Mode.values()) {
-                click(mc.gui.screen(), mode.label);
-                check(input(mc.gui.screen(), "Timeout seconds").active == (mode == HudVisibility.Mode.TIME), "Timeout field gating");
-                check(input(mc.gui.screen(), "Range blocks").active == (mode == HudVisibility.Mode.RANGE), "Range field gating");
+                click(ClientCompat.screen(mc), mode.label);
+                check(input(ClientCompat.screen(mc), "Timeout seconds").active == (mode == HudVisibility.Mode.TIME), "Timeout field gating");
+                check(input(ClientCompat.screen(mc), "Range blocks").active == (mode == HudVisibility.Mode.RANGE), "Range field gating");
             }
         });
         context.waitTicks(2);
         if (scale == 2) context.takeScreenshot("combined-hud-settings");
-        context.runOnClient(mc -> click(mc.gui.screen(), "Cancel"));
+        context.runOnClient(mc -> click(ClientCompat.screen(mc), "Cancel"));
         if (scale == 2) {
-            context.runOnClient(mc -> setReferenceColor(mc.gui.screen()));
+            context.runOnClient(mc -> setReferenceColor(ClientCompat.screen(mc)));
             context.waitTicks(2);
             context.takeScreenshot("paint-style-color-picker");
-            context.runOnClient(mc -> click(mc.gui.screen(), "Reset"));
+            context.runOnClient(mc -> click(ClientCompat.screen(mc), "Reset"));
         }
     }
     private static AbstractWidget widget(Screen screen, String label) {
@@ -112,7 +114,7 @@ final class VtpCustomizationGameTest {
         check(VtpAccent.color() == 0xFF0000FF, "Horizontal hue drag did not select blue");
         checkColorSync(screen);
         int beforeArrow = VtpAccent.color();
-        check(hue.keyPressed(new KeyEvent(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT, 0, 0)), "Hue keyboard control unavailable");
+        check(hue.keyPressed(new KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT, 0, 0)), "Hue keyboard control unavailable");
         check(VtpAccent.color() != beforeArrow, "Hue arrow key did not make a fine adjustment");
         checkColorSync(screen);
         input(screen, "Hex color").setValue("#FFFFFF");
@@ -185,8 +187,8 @@ final class VtpCustomizationGameTest {
     static void run(ClientGameTestContext context) {
         context.setScreen(VtpSettingsScreen::new);
         context.runOnClient(mc -> {
-            click(mc.gui.screen(), "Settings");
-            var screen = mc.gui.screen();
+            click(ClientCompat.screen(mc), "Settings");
+            var screen = ClientCompat.screen(mc);
             var plane = screen.children().stream().filter(e -> e instanceof AbstractWidget).map(e -> (AbstractWidget) e)
                     .filter(e -> e.getMessage().getString().equals("Saturation and brightness")).findFirst().orElseThrow();
             screen.mouseClicked(new MouseButtonEvent(plane.getX() + 15, plane.getY() + 10, LEFT), false);
@@ -203,11 +205,11 @@ final class VtpCustomizationGameTest {
             input(screen, "Hex color").setValue("#3399FF");
             check(VtpAccent.color() == 0xFF3399FF, "Typed accent not applied live");
             click(screen, "HUD settings");
-            click(mc.gui.screen(), "HUD: ON");
-            click(mc.gui.screen(), "Cancel");
+            click(ClientCompat.screen(mc), "HUD: ON");
+            click(ClientCompat.screen(mc), "Cancel");
             check(VillagerHudRenderer.isEnabled(), "Cancel committed HUD toggle");
-            click(mc.gui.screen(), "HUD settings");
-            screen = mc.gui.screen();
+            click(ClientCompat.screen(mc), "HUD settings");
+            screen = ClientCompat.screen(mc);
             click(screen, "After time");
             input(screen, "Timeout seconds").setValue("0");
             check(!button(screen, "Apply").active, "Zero timeout accepted");
@@ -223,8 +225,8 @@ final class VtpCustomizationGameTest {
             check(VtpAccent.color() == 0xFF3399FF, "Inline accent did not survive save/reload");
             check(HudVisibility.mode() == HudVisibility.Mode.RANGE && HudVisibility.seconds() == 7 && HudVisibility.range() == 24,
                     "Visibility settings did not survive save/reload");
-            click(mc.gui.screen(), "Targets");
-            screen = mc.gui.screen();
+            click(ClientCompat.screen(mc), "Targets");
+            screen = ClientCompat.screen(mc);
             choose(screen, "efficiency");
             for (int i = 1; i <= 5; i++) check(button(screen, String.valueOf(i)).active, "Efficiency level disabled: " + i);
             click(screen, "5"); click(screen, "Add target");
@@ -238,14 +240,14 @@ final class VtpCustomizationGameTest {
         });
         context.waitTicks(2);
         context.takeScreenshot("cheapest-mending-minimum");
-        context.runOnClient(mc -> click(mc.gui.screen(), "Settings"));
-        context.runOnClient(mc -> setReferenceColor(mc.gui.screen()));
+        context.runOnClient(mc -> click(ClientCompat.screen(mc), "Settings"));
+        context.runOnClient(mc -> setReferenceColor(ClientCompat.screen(mc)));
         context.waitTicks(2);
         context.takeScreenshot("inline-color-settings-minimum");
-        context.runOnClient(mc -> input(mc.gui.screen(), "Hex color").setValue("#3399FF"));
-        context.runOnClient(mc -> click(mc.gui.screen(), "HUD settings"));
+        context.runOnClient(mc -> input(ClientCompat.screen(mc), "Hex color").setValue("#3399FF"));
+        context.runOnClient(mc -> click(ClientCompat.screen(mc), "HUD settings"));
         context.takeScreenshot("combined-hud-settings-minimum");
-        context.runOnClient(mc -> { click(mc.gui.screen(), "Cancel"); click(mc.gui.screen(), "Done"); });
+        context.runOnClient(mc -> { click(ClientCompat.screen(mc), "Cancel"); click(ClientCompat.screen(mc), "Done"); });
         testVisibility(context);
         context.waitTicks(2);
         context.takeScreenshot("custom-accent-hud");

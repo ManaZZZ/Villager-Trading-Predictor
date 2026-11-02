@@ -6,7 +6,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
 /** Keeps vanilla editing, selection, IME and caret placement; changes only the border. */
-public final class VtpEditBox extends EditBox {
+public class VtpEditBox extends EditBox {
     private final VtpMotion.Value focus = new VtpMotion.Value();
     public VtpEditBox(Font font, int x, int y, int w, int h, Component label) {
         super(font, x, y, w, h, label);

@@ -1,5 +1,7 @@
 package net.manaz.vtp;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.manaz.vtp.gui.*;
 import net.manaz.vtp.render.*;
@@ -8,7 +10,7 @@ import net.minecraft.client.input.*;
 import static net.manaz.vtp.VtpUiGameTest.*;
 
 final class VtpHudSizeGameTest {
-    private static final MouseButtonInfo LEFT = new MouseButtonInfo(0, 0);
+    private static final MouseButtonInfo LEFT = new MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0);
     private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
     private static AbstractSliderButton slider(VtpHudSettingsScreen screen) {
         return screen.children().stream().filter(e -> e instanceof AbstractSliderButton)
@@ -27,8 +29,8 @@ final class VtpHudSizeGameTest {
         context.setScreen(VtpSettingsScreen::new);
         context.runOnClient(mc -> {
             HudSize.set(100);
-            click(mc.gui.screen(), "HUD settings");
-            var screen = (VtpHudSettingsScreen) mc.gui.screen();
+            click(ClientCompat.screen(mc), "HUD settings");
+            var screen = (VtpHudSettingsScreen) ClientCompat.screen(mc);
             checkLayout(screen, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
             drag(screen, 50);
             check(screen.previewPercent() == 50 && screen.isResizing(), "Live resize did not start");
@@ -41,22 +43,22 @@ final class VtpHudSizeGameTest {
             check(!screen.isResizing(), "Resize mode did not end on release");
             click(screen, "Cancel");
             check(HudSize.percent() == 100, "Cancel changed HUD size");
-            click(mc.gui.screen(), "HUD settings");
+            click(ClientCompat.screen(mc), "HUD settings");
         });
         for (int percent : new int[]{75, 150}) {
-            context.runOnClient(mc -> drag((VtpHudSettingsScreen) mc.gui.screen(), percent));
+            context.runOnClient(mc -> drag((VtpHudSettingsScreen) ClientCompat.screen(mc), percent));
             context.waitTicks(2);
             context.takeScreenshot("live-hud-resize-" + percent);
-            context.runOnClient(mc -> release((VtpHudSettingsScreen) mc.gui.screen()));
+            context.runOnClient(mc -> release((VtpHudSettingsScreen) ClientCompat.screen(mc)));
         }
         context.runOnClient(mc -> {
-            click(mc.gui.screen(), "Apply");
+            click(ClientCompat.screen(mc), "Apply");
             check(HudSize.percent() == 150, "Live size not applied");
             VtpPersistence.flush(); HudSize.set(100); VtpPersistence.loadGlobalSettings();
             check(HudSize.percent() == 150, "HUD size did not survive save/reload");
-            click(mc.gui.screen(), "HUD settings");
-            check(((VtpHudSettingsScreen) mc.gui.screen()).previewPercent() == 150, "Saved percentage not displayed");
-            click(mc.gui.screen(), "100%"); click(mc.gui.screen(), "Apply"); click(mc.gui.screen(), "Done");
+            click(ClientCompat.screen(mc), "HUD settings");
+            check(((VtpHudSettingsScreen) ClientCompat.screen(mc)).previewPercent() == 150, "Saved percentage not displayed");
+            click(ClientCompat.screen(mc), "100%"); click(ClientCompat.screen(mc), "Apply"); click(ClientCompat.screen(mc), "Done");
             var view = HudView.current();
             check(view != null && VillagerHudRenderer.rowMarker(view.trades().getFirst()).equals(">"), "Current marker not compact");
             var pending = new HudView.Row("Current", "...", -1, false, true);

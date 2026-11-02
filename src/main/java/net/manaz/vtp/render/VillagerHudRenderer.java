@@ -1,5 +1,7 @@
 package net.manaz.vtp.render;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.manaz.vtp.gui.*;
@@ -55,7 +57,7 @@ public class VillagerHudRenderer implements HudElement {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker delta) {
         var mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || mc.gui.hud.isHidden() || mc.gui.screen() != null) {
+        if (mc.player == null || mc.level == null || ClientCompat.hudHidden(mc) || ClientCompat.screen(mc) != null) {
             resetFade(); return;
         }
         HudView view = HudView.current();

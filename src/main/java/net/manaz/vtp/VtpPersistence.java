@@ -6,6 +6,7 @@ import net.manaz.vtp.gui.VtpAccent;
 import net.manaz.vtp.prediction.*;
 import net.manaz.vtp.render.*;
 import net.manaz.vtp.seed.SeedProvider;
+import net.manaz.vtp.seed.ServerSeedStore;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.*;
@@ -41,7 +42,7 @@ public final class VtpPersistence {
     private static void resetState() {
         epoch++; dirty = false;
         VillagerTracker.clear(); HudVisibility.reset(); PredictionEngine.clearAllOffsets(); SingleplayerSequences.clear();
-        CalibrationListStore.clear(); CalibrationService.clear(); VillagerHudRenderer.clearTargets();
+        CalibrationListStore.clear(); CalibrationDraftStore.clear(); CalibrationService.clear(); VillagerHudRenderer.clearTargets();
     }
     public static void markDirty() { dirty = true; }
     public static void tick() {
@@ -49,6 +50,10 @@ public final class VtpPersistence {
     }
     public static void saveCurrentWorldState() { markDirty(); }
     public static void changeSeed(long seed) {
+        var client = Minecraft.getInstance();
+        if (client.getSingleplayerServer() == null && client.getCurrentServer() != null)
+            ServerSeedStore.saveSeedForServer(client.getCurrentServer().ip, seed);
+        if (sessionSeed != null && sessionSeed == seed && SeedProvider.getSeed().equals(OptionalLong.of(seed))) return;
         if (sessionSeed != null) save(sessionSeed);
         flush();
         SeedProvider.setManualSeed(seed);
@@ -71,7 +76,7 @@ public final class VtpPersistence {
         if (identity == null) return;
         JsonObject root = new JsonObject();
         root.addProperty("schemaVersion", 3);
-        root.addProperty("minecraftVersion", "26.2");
+        root.addProperty("minecraftVersion", net.manaz.vtp.compat.BuildInfo.minecraftFamily());
         root.addProperty("seed", seed);
         JsonObject offsets = new JsonObject();
         PredictionEngine.getAllOffsets().forEach((key, value) -> offsets.addProperty(key.identifier().toString(), value));
@@ -97,7 +102,7 @@ public final class VtpPersistence {
             JsonObject root = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
             restoreTargets(root);
             if (legacy || !root.has("schemaVersion") || root.get("schemaVersion").getAsInt() != 3
-                    || !root.has("minecraftVersion") || !root.get("minecraftVersion").getAsString().equals("26.2")) {
+                    || !root.has("minecraftVersion") || !root.get("minecraftVersion").getAsString().equals(net.manaz.vtp.compat.BuildInfo.minecraftFamily())) {
                 VillagerTradingPredictor.LOGGER.info("[VTP] Imported targets only. Old inferred trade state requires fresh observation/calibration.");
                 return;
             }
@@ -160,6 +165,7 @@ public final class VtpPersistence {
         root.addProperty("romanNumerals", VillagerHudRenderer.isRomanNumerals());
         root.addProperty("showLevels", VillagerHudRenderer.isShowLevels());
         root.addProperty("hudSizePercent", HudSize.percent());
+        root.addProperty("seedVisible", SeedProvider.isSeedVisible());
         write(DIR.resolve("settings.json"), root);
     }
     public static void loadGlobalSettings() {
@@ -177,6 +183,7 @@ public final class VtpPersistence {
             if (root.has("showLevels")) VillagerHudRenderer.setShowLevels(root.get("showLevels").getAsBoolean());
             if (root.has("romanNumerals")) VillagerHudRenderer.setRomanNumerals(root.get("romanNumerals").getAsBoolean());
             HudSize.set(root.has("hudSizePercent") ? root.get("hudSizePercent").getAsInt() : HudSize.DEFAULT);
+            SeedProvider.setSeedVisible(root.has("seedVisible") && root.get("seedVisible").getAsBoolean());
         } catch (Exception e) { VillagerTradingPredictor.LOGGER.warn("[VTP] Could not read settings", e); }
     }
 }

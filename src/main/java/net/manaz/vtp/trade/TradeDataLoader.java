@@ -1,13 +1,16 @@
 package net.manaz.vtp.trade;
 
+import com.mojang.serialization.DynamicOps;
 import net.manaz.vtp.VillagerTradingPredictor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.EnchantmentTags;
 import net.minecraft.world.entity.npc.villager.VillagerProfession;
@@ -35,8 +38,8 @@ public class TradeDataLoader {
 
     /**
      * Look up a TradeSet by its ResourceKey.
-     * Prefers the integrated server registry (singleplayer); falls back to the client registry
-     * for multiplayer — TRADE_SET is a datapack registry and is synced to clients on login.
+     * Prefers the integrated server registry (singleplayer), then any synced client registry.
+     * Vanilla does not sync TRADE_SET or VILLAGER_TRADE; multiplayer uses the classpath fallback.
      */
     public static Optional<TradeSet> getTradeSet(ResourceKey<TradeSet> key) {
         // 1. Integrated server registry (singleplayer)
@@ -59,6 +62,16 @@ public class TradeDataLoader {
         return ClientTradeRegistry.getTradeSet(key);
     }
 
+    /** Serialize fallback definitions with the local registry that owns their trade holders. */
+    public static <T> RegistryOps<T> createSerializationContext(TradeSet tradeSet, DynamicOps<T> ops) {
+        HolderLookup.Provider lookup = ClientTradeRegistry.getLookup(tradeSet).orElseGet(() -> {
+            RegistryAccess access = getServerRegistryAccess();
+            if (access == null) access = getClientRegistryAccess();
+            return access == null ? RegistryAccess.EMPTY : access;
+        });
+        return lookup.createSerializationContext(ops);
+    }
+
     /**
      * Get the TradeSet ResourceKey for a given profession and level.
      */
@@ -72,7 +85,7 @@ public class TradeDataLoader {
      * This ordering must match the server's ordering for deterministic prediction.
      */
     public static List<Holder<VillagerTrade>> getTradesFromSet(TradeSet tradeSet) {
-        HolderSet<VillagerTrade> trades = tradeSet.getTrades();
+        HolderSet<VillagerTrade> trades = net.manaz.vtp.compat.TradeCompat.trades(tradeSet);
         List<Holder<VillagerTrade>> result = new ArrayList<>();
         for (int i = 0; i < trades.size(); i++) {
             result.add(trades.get(i));

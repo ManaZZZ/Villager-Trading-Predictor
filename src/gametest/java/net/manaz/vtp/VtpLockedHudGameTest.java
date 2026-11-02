@@ -1,5 +1,7 @@
 package net.manaz.vtp;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.manaz.vtp.gui.*;
 import net.manaz.vtp.render.*;
@@ -68,7 +70,7 @@ final class VtpLockedHudGameTest {
         context.takeScreenshot("locked-three-books-and-predictions");
         context.setScreen(VtpSettingsScreen::new);
         context.runOnClient(mc -> {
-            var screen = mc.gui.screen();
+            var screen = ClientCompat.screen(mc);
             boolean active = screen.children().stream().filter(e -> e instanceof Button).map(e -> (Button) e)
                     .anyMatch(b -> b.getMessage().getString().equals("Sequence") && b.active);
             if (active) click(screen, "Sequence");

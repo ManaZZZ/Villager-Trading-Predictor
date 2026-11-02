@@ -2,6 +2,7 @@ package net.manaz.vtp.trade;
 
 import com.google.gson.*;
 import com.mojang.serialization.JsonOps;
+import net.manaz.vtp.VillagerTradingPredictor;
 import net.manaz.vtp.mixin.accessor.*;
 import net.manaz.vtp.rng.SimulatedRandomSource;
 import net.minecraft.client.Minecraft;
@@ -12,6 +13,7 @@ import net.minecraft.resources.*;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.trading.*;
 import net.minecraft.world.level.storage.loot.functions.EnchantRandomlyFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import java.util.*;
 
 /** Supported deterministic trade definitions are validated before simulation. */
@@ -25,12 +27,26 @@ public final class TradeSimulator {
                 : mc.level.registryAccess();
     }
 
+    public static List<LootItemFunction> getItemModifiers(VillagerTrade trade) {
+        return net.manaz.vtp.compat.TradeCompat.modifiers(trade);
+    }
+
+    private static void collectModifierJson(JsonElement modifier, JsonArray result) {
+        if (modifier.isJsonArray()) {
+            modifier.getAsJsonArray().forEach(element -> collectModifierJson(element, result));
+        } else if (modifier.isJsonObject()
+                && "minecraft:sequence".equals(modifier.getAsJsonObject().get("type").getAsString())
+                && !modifier.getAsJsonObject().has("condition")) {
+            collectModifierJson(modifier.getAsJsonObject().get("functions"), result);
+        } else result.add(modifier);
+    }
+
     public static String compatibilityProblem(TradeSet set) {
         if (set.randomSequence().isEmpty()) return "trade set has no named random sequence";
         try {
-            var ops = access().createSerializationContext(JsonOps.INSTANCE);
-            JsonObject json = TradeSet.CODEC.encodeStart(ops, set).getOrThrow().getAsJsonObject();
-            if (json.has("amount") && !json.get("amount").isJsonPrimitive()) return "random trade amount";
+            var ops = TradeDataLoader.createSerializationContext(set, JsonOps.INSTANCE);
+            if (!net.manaz.vtp.compat.TradeCompat.constantAmount(set, ops))
+                return "random trade amount";
             for (var holder : TradeDataLoader.getTradesFromSet(set)) {
                 JsonObject trade = VillagerTrade.CODEC.encodeStart(ops, holder.value()).getOrThrow().getAsJsonObject();
                 if (trade.has("merchant_predicate")) return "conditional trades (including Trade Rebalance)";
@@ -49,15 +65,18 @@ public final class TradeSimulator {
                 JsonObject gives = trade.getAsJsonObject("gives");
                 if (gives.has("components") && gives.getAsJsonObject("components").size() > 0)
                     return "custom output components";
-                JsonArray functions = trade.has("given_item_modifiers") ? trade.getAsJsonArray("given_item_modifiers") : new JsonArray();
+                JsonArray functions = new JsonArray();
+                JsonElement modifiers = net.manaz.vtp.compat.TradeCompat.modifiersJson(trade);
+                if (modifiers != null) collectModifierJson(modifiers, functions);
                 int randomFunctions = 0;
                 for (JsonElement element : functions) {
+                    if (!element.isJsonObject()) return "referenced item modifiers";
                     JsonObject function = element.getAsJsonObject();
-                    String id = function.get("function").getAsString();
+                    String id = function.get("type").getAsString();
+                    if (function.has("condition")) return "conditional item modifiers";
                     if (id.equals("minecraft:enchant_randomly")) {
                         randomFunctions++;
-                        if (randomFunctions > 1 || !function.has("options")
-                                || (function.has("conditions") && !function.getAsJsonArray("conditions").isEmpty()))
+                        if (randomFunctions > 1 || !function.has("options"))
                             return "unsupported enchantment options or conditions";
                         if (!gives.get("id").getAsString().equals("minecraft:enchanted_book")
                                 && !gives.get("id").getAsString().equals("minecraft:book")) return "non-book enchantments";
@@ -66,19 +85,20 @@ public final class TradeSimulator {
                     } else if (id.equals("minecraft:filtered") && randomFunctions == 1) {
                         // Only the vanilla postcondition is safe to omit: the supported function always adds a book enchantment.
                         JsonObject expected = JsonParser.parseString(
-                                "{\"function\":\"minecraft:filtered\",\"item_filter\":{\"items\":\"minecraft:enchanted_book\",\"predicates\":{\"minecraft:stored_enchantments\":[{}]}},\"on_fail\":{\"function\":\"minecraft:discard\"}}").getAsJsonObject();
+                                "{\"type\":\"minecraft:filtered\",\"item_filter\":{\"items\":\"minecraft:enchanted_book\",\"predicates\":{\"minecraft:stored_enchantments\":[{}]}},\"on_fail\":{\"type\":\"minecraft:discard\"}}").getAsJsonObject();
                         if (!function.equals(expected)) return "custom item filter";
                     } else return "unsupported item modifier: " + id;
                 }
                 if (randomFunctions > 0) {
-                    var acc = (VillagerTradeAccessor) (Object) holder.value();
-                    var random = acc.vtp$getGivenItemModifiers().stream().filter(f -> f instanceof EnchantRandomlyFunction).findFirst().orElseThrow();
+                    var random = getItemModifiers(holder.value()).stream().filter(f -> f instanceof EnchantRandomlyFunction).findFirst().orElseThrow();
                     var options = ((EnchantRandomlyAccessor) random).vtp$getOptions();
                     if (options.isEmpty() || options.get().size() == 0) return "empty enchantment pool";
                 }
             }
             return "";
         } catch (Exception e) {
+            VillagerTradingPredictor.LOGGER.warn("[VTP] Could not validate trade definitions for {}",
+                    set.randomSequence().orElseThrow(), e);
             return "trade definitions unavailable";
         }
     }
@@ -92,7 +112,7 @@ public final class TradeSimulator {
             int index = rng.nextInt(pool.size());
             Holder<VillagerTrade> trade = set.allowDuplicates() ? pool.get(index) : pool.remove(index);
             var acc = (VillagerTradeAccessor) (Object) trade.value();
-            var function = acc.vtp$getGivenItemModifiers().stream()
+            var function = getItemModifiers(trade.value()).stream()
                     .filter(f -> f instanceof EnchantRandomlyFunction).findFirst();
             Optional<EnchantmentResult> enchantment = Optional.empty();
             if (function.isPresent()) {

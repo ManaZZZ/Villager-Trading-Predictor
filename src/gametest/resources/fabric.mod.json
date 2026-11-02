@@ -4,6 +4,14 @@
   "version": "1.0.0",
   "environment": "client",
   "entrypoints": {
-    "fabric-client-gametest": ["net.manaz.vtp.VtpGameTest"]
+    "fabric-client-gametest": [
+      "net.manaz.vtp.VtpUniversalGameTest",
+      "net.manaz.vtp.VtpGameTest",
+      "net.manaz.vtp.VtpMultiplayerTradeGameTest",
+      "net.manaz.vtp.VtpQolGameTest"
+    ]
+  },
+  "depends": {
+    "villager-trading-predictor-universal": "=${bundleVersion}"
   }
 }

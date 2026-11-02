@@ -1,6 +1,7 @@
 package net.manaz.vtp.mixin;
 
 import net.manaz.vtp.gui.VtpUi;
+import net.manaz.vtp.gui.MerchantCalibrationControls;
 import net.manaz.vtp.render.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -10,16 +11,32 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.MerchantMenu;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MerchantScreen.class)
 public abstract class MerchantScreenMixin extends AbstractContainerScreen<MerchantMenu> {
+    @Unique private MerchantCalibrationControls vtp$calibrationControls;
     protected MerchantScreenMixin(MerchantMenu menu, Inventory inventory, Component title) { super(menu, inventory, title); }
+
+    @Inject(method = "init", at = @At("RETURN"))
+    private void vtp$addObservationButton(CallbackInfo ci) {
+        vtp$calibrationControls = Minecraft.getInstance().getSingleplayerServer() == null
+                ? new MerchantCalibrationControls(menu, leftPos + (imageWidth - 132) / 2,
+                        Math.min(topPos + imageHeight + 4, height - 34), width, widget -> addRenderableWidget(widget))
+                : null;
+    }
+
+    @Override protected void containerTick() {
+        super.containerTick();
+        if (vtp$calibrationControls != null) vtp$calibrationControls.tick();
+    }
 
     @Inject(method = "extractContents", at = @At("RETURN"))
     private void vtp$renderPrediction(GuiGraphicsExtractor g, int mx, int my, float delta, CallbackInfo ci) {
+        if (vtp$calibrationControls != null) vtp$calibrationControls.extract(g, mx, my);
         if (!VillagerHudRenderer.isEnabled()) return;
         HudView view = HudView.current();
         if (view == null || !view.uuid().equals(VillagerTracker.getMenuVillagerUuid())

@@ -1,5 +1,7 @@
 package net.manaz.vtp.render;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
 import net.minecraft.world.entity.npc.villager.Villager;
@@ -45,10 +47,10 @@ public final class HudVisibility {
         if (world != mc.level || !Objects.equals(selected, uuid)) {
             reset(); world = mc.level; selected = uuid; lastAttention = now;
         }
-        looking = mc.gui.screen() == null && mc.crosshairPickEntity instanceof Villager villager
+        looking = ClientCompat.screen(mc) == null && mc.crosshairPickEntity instanceof Villager villager
                 && villager.isAlive() && uuid.equals(villager.getUUID());
         if (looking) entity = (Villager) mc.crosshairPickEntity;
-        boolean trading = mc.gui.screen() instanceof MerchantScreen && uuid.equals(VillagerTracker.getMenuVillagerUuid());
+        boolean trading = ClientCompat.screen(mc) instanceof MerchantScreen && uuid.equals(VillagerTracker.getMenuVillagerUuid());
         if (looking || trading) lastAttention = now;
         if (entity != null && (entity.isRemoved() || !entity.isAlive())) entity = null;
         if (mode == Mode.RANGE && entity == null) {

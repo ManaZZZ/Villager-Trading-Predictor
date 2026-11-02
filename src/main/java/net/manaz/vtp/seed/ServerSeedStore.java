@@ -20,6 +20,7 @@ public class ServerSeedStore {
 
     public static void saveSeedForServer(String address, long seed) {
         Map<String, Long> map = loadMap();
+        if (Objects.equals(map.get(normalize(address)), seed)) return;
         map.put(normalize(address), seed);
         writeMap(map);
         VillagerTradingPredictor.LOGGER.info("[VTP] Saved seed {} for server {}", seed, address);

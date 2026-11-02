@@ -14,6 +14,10 @@ import java.util.OptionalLong;
 public class SeedProvider {
     private static OptionalLong manualSeed = OptionalLong.empty();
     private static boolean seedLogged = false;
+    private static boolean seedVisible;
+
+    public static boolean isSeedVisible() { return seedVisible; }
+    public static void setSeedVisible(boolean visible) { seedVisible = visible; }
 
     public static void setManualSeed(long seed) {
         manualSeed = OptionalLong.of(seed);

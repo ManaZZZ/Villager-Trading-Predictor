@@ -1,5 +1,7 @@
 package net.manaz.vtp;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.manaz.vtp.command.VtpCommand;
@@ -61,7 +63,7 @@ public class VillagerTradingPredictor implements ClientModInitializer {
         });
 
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.MerchantScreen) {
+            if (ClientCompat.screen(client) instanceof net.minecraft.client.gui.screens.inventory.MerchantScreen) {
                 var uuid = VillagerTracker.getMenuVillagerUuid();
                 VillagerTracker.getData(uuid).ifPresent(data -> VillagerTracker.updateAndSelect(uuid, data));
             } else if (client.crosshairPickEntity instanceof net.minecraft.world.entity.npc.villager.Villager villager) {

@@ -1,5 +1,7 @@
 package net.manaz.vtp.autoreroll;
 
+import net.manaz.vtp.compat.ClientCompat;
+
 import net.manaz.vtp.prediction.EnchantmentTarget;
 import net.manaz.vtp.prediction.PredictionEngine;
 import net.manaz.vtp.prediction.PredictionResult;
@@ -248,7 +250,7 @@ public class AutoRerollManager {
                         placeAgainst.getZ() + 0.5 + placeDir.getStepZ() * 0.5);
                 BlockHitResult placeHit = new BlockHitResult(hitVec, placeDir, placeAgainst, false);
                 mc.gameMode.useItemOn(mc.player, hand, placeHit);
-                mc.player.swing(hand);
+                ClientCompat.swing(mc, hand);
                 phase = Phase.WAIT_PLACE;
                 phaseTicks = 0;
             }

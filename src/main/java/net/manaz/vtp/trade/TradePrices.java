@@ -30,7 +30,7 @@ public final class TradePrices {
             for (var holder : TradeDataLoader.getTradesFromSet(set.get())) {
                 var trade = (VillagerTradeAccessor) holder.value();
                 if (trade.vtp$getWants().item().value() != Items.EMERALD) continue;
-                for (var modifier : trade.vtp$getGivenItemModifiers()) {
+                for (var modifier : TradeSimulator.getItemModifiers(holder.value())) {
                     if (!(modifier instanceof EnchantRandomlyFunction)) continue;
                     var random = (EnchantRandomlyAccessor) modifier;
                     // Server/client holders can differ; compare their registry keys.

@@ -205,10 +205,18 @@ public final class PredictionEngine {
         return matches;
     }
 
-    public record CalibrationSpec(ResourceKey<Enchantment> enchantment, int level, int price, boolean noTrade) {
+    public record CalibrationSpec(ResourceKey<Enchantment> enchantment, int level, int price, boolean noTrade,
+                                  List<ObservedOffer> offers) {
+        public CalibrationSpec { offers = List.copyOf(offers); }
+        public CalibrationSpec(ResourceKey<Enchantment> enchantment, int level, int price, boolean noTrade) {
+            this(enchantment, level, price, noTrade, List.of());
+        }
         public CalibrationSpec(ResourceKey<Enchantment> ench, int level) { this(ench, level, -1, false); }
         public static CalibrationSpec of(ResourceKey<Enchantment> ench, int level, int price) { return new CalibrationSpec(ench, level, price, false); }
         public static CalibrationSpec missing() { return new CalibrationSpec(null, 0, -1, true); }
+        public static CalibrationSpec captured(List<ObservedOffer> offers) {
+            return new CalibrationSpec(null, 0, -1, false, offers);
+        }
     }
     public static List<Integer> findCalibrationSequence(long seed, Holder<VillagerProfession> profession,
                                                        int level, List<CalibrationSpec> specs) {
@@ -222,6 +230,12 @@ public final class PredictionEngine {
             boolean match = true;
             for (int j = 0; j < specs.size(); j++) {
                 CalibrationSpec spec = specs.get(j);
+                if (!spec.offers().isEmpty()) {
+                    if (!OfferMatching.same(spec.offers(), TradeSimulator.fingerprint(rounds.get(i + j)))) {
+                        match = false; break;
+                    }
+                    continue;
+                }
                 var books = rounds.get(i + j).stream().flatMap(o -> o.enchantment().stream()).toList();
                 if (spec.noTrade() ? !books.isEmpty() : books.stream().noneMatch(e ->
                         e.enchantment().is(spec.enchantment()) && e.level() == spec.level()

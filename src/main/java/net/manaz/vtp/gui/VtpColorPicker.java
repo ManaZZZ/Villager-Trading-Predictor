@@ -1,12 +1,12 @@
 package net.manaz.vtp.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.narration.*;
 import net.minecraft.client.input.*;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 import java.util.function.Consumer;
 
 /** Inline square HSV picker with a live preview and synchronized RGB/hex controls. */
@@ -136,12 +136,12 @@ final class VtpColorPicker {
         @Override protected void onDrag(MouseButtonEvent event, double dx, double dy) { pick(event.x(), event.y()); }
         @Override public boolean keyPressed(KeyEvent event) {
             int key = event.key();
-            if (key != GLFW.GLFW_KEY_LEFT && key != GLFW.GLFW_KEY_RIGHT && key != GLFW.GLFW_KEY_UP && key != GLFW.GLFW_KEY_DOWN) return false;
-            if (hueOnly) hue = Math.clamp(hue + (key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_RIGHT ? 1 : -1) / 360f, 0, 1);
+            if (key != InputConstants.KEY_LEFT && key != InputConstants.KEY_RIGHT && key != InputConstants.KEY_UP && key != InputConstants.KEY_DOWN) return false;
+            if (hueOnly) hue = Math.clamp(hue + (key == InputConstants.KEY_DOWN || key == InputConstants.KEY_RIGHT ? 1 : -1) / 360f, 0, 1);
             else {
-                if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT)
-                    saturation = Math.clamp(saturation + (key == GLFW.GLFW_KEY_RIGHT ? 0.01f : -0.01f), 0, 1);
-                else brightness = Math.clamp(brightness + (key == GLFW.GLFW_KEY_UP ? 0.01f : -0.01f), 0, 1);
+                if (key == InputConstants.KEY_LEFT || key == InputConstants.KEY_RIGHT)
+                    saturation = Math.clamp(saturation + (key == InputConstants.KEY_RIGHT ? 0.01f : -0.01f), 0, 1);
+                else brightness = Math.clamp(brightness + (key == InputConstants.KEY_UP ? 0.01f : -0.01f), 0, 1);
             }
             changed(); return true;
         }
